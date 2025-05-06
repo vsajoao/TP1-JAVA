@@ -18,14 +18,17 @@ public class Conta {
         return new ArrayList<>(carteiras);
     }
 
-    public Carteira obterCarteira(Codigo codigo) {
+    public Carteira obterCarteira(Codigo codigoCarteira) {
         return carteiras.stream()
-                .filter(c -> c.getCodigo().equals(codigo))
+                .filter(c -> c.getCodigo().equals(codigoCarteira))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Conta não encontrada"));
     }
 
     public void adicionarCarteira(Carteira carteira) {
+        if (carteiras.size() >= 5) {
+            throw new IllegalArgumentException("Máximo de 5 carteiras permitido por conta");
+        }
         carteiras.add(carteira);
     }
 

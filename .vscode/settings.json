@@ -12,5 +12,6 @@
         "vmArgs": [
             "-ea"
         ]
-    }
+    },
+    "java.debug.settings.onBuildFailureProceed": true
 }

@@ -8,16 +8,18 @@ public class Ordem {
     private final Data data;
     private final Quantidade quantidade;
     private final Dinheiro preco;
-    private Carteira carteira;
+    private final Codigo codigoCarteira;
+   
 
-    public Ordem(Codigo codigo, CodNegociacao codNegociacao, Data data, Quantidade quantidade, Dinheiro preco,
-            Carteira carteira) {
+    public Ordem(Codigo codigo, CodNegociacao codNegociacao, Data data, Quantidade quantidade, Dinheiro preco,Codigo codigoCarteira
+            ) {
         this.codigo = codigo;
         this.codNegociacao = codNegociacao;
         this.data = data;
         this.quantidade = quantidade;
         this.preco = preco;
-        this.carteira = carteira;
+        this.codigoCarteira = codigoCarteira;
+        
     }
 
     public Codigo getCodigo() {
@@ -40,7 +42,8 @@ public class Ordem {
         return preco;
     }
 
-    public Carteira getCarteira() {
-        return carteira;
+    public Codigo getCodigoCarteira(){
+        return codigoCarteira;
     }
+    
 }

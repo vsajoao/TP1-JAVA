@@ -1,93 +1,113 @@
 package service;
 
-import entity.Ordem;
-import entity.Carteira;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+
+
 import domain.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import entity.Carteira;
+import entity.Conta;
+import entity.Ordem;
 
 public class OrdemService {
-
-    private final List<Ordem> ordens = new ArrayList<>();
+    private static final String ARQUIVO_PATH = "/home/jota/TP1-JAVA/data/DADOS_HISTORICOS.txt";
     private final AutenticacaoService autenticacaoService;
-    private final HistoricalDataService dataService;
+    
 
-    // 1. Corrigir injeção de dependência
-    public OrdemService(AutenticacaoService autenticacaoService,
-            HistoricalDataService dataService) {
+    public OrdemService(AutenticacaoService autenticacaoService) {
         this.autenticacaoService = autenticacaoService;
-        this.dataService = dataService;
     }
 
-    public void criarOrdem(Codigo codigoOrdem, CodNegociacao codigoPapel,
-            Data data, Quantidade quantidade, Codigo codigoCarteira) {
 
-        // 2. Validar código único primeiro
-        validarCodigoUnico(codigoOrdem);
+    public double obterPreco(CodNegociacao codigo, Data data) {
+        String codPapel = codigo.getValor();
+        String dataPapel = data.getValor();
+        
+        try (BufferedReader arquivo = new BufferedReader(new FileReader(ARQUIVO_PATH))) {
+            
+            String linha;
+            while ((linha = arquivo.readLine()) != null) {
+                
+               
+                if (linha.length() < 125) {
+                    System.err.println("Linha inválida (tamanho insuficiente): " + linha);
+                    continue;
+                }
+                
+              
+                String codigoLinha = linha.substring(12, 24).trim();
+                if (!codigoLinha.equals(codPapel)) continue;
+                
+             
+                String dataLinha = linha.substring(2, 10);
+                if (!dataLinha.equals(dataPapel)) continue;
+                
+               
+                String strPreco = linha.substring(112, 125).trim();
+                try {
+                    return Long.parseLong(strPreco) / 100.0;
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Formato de preço inválido na linha: " + linha, e);
+                }
+            }
+            
+            throw new RuntimeException("Registro não encontrado para código: " + codPapel + " e data: " + dataPapel);
+            
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao ler arquivo: " + e.getMessage(), e);
+        }
+    }
 
-        // 3. Buscar carteira na conta autenticada
-        Carteira carteira = autenticacaoService.getContaAutenticada()
-                .getCarteiras().stream()
-                .filter(c -> c.getCodigo().equals(codigoCarteira))
+    public void criarOrdem(Codigo codigoOrdem,CodNegociacao codNegociacao,Data data,Quantidade quantidade,Codigo codigoCarteira){
+        Conta conta = autenticacaoService.getContaAutenticada();
+        Carteira carteira = conta.obterCarteira(codigoCarteira);
+        
+
+        double quant = quantidade.getValor();
+        double preco = obterPreco(codNegociacao, data);
+        Dinheiro precoFinal = new Dinheiro(preco*quant);
+
+        Ordem ordem = new Ordem(codigoOrdem, codNegociacao, data, quantidade, precoFinal,codigoCarteira);
+        carteira.adicionarOrdem(ordem);
+    }
+
+    public void excluirOrdem(Ordem ordem,Codigo codigoCarteira){
+        Conta conta = autenticacaoService.getContaAutenticada();
+        Carteira carteira = conta.obterCarteira(codigoCarteira);
+
+        carteira.removerOrdem(ordem);
+    }
+
+    public String visualizarOrdem(Codigo codigoCarteira, Codigo codigoOrdem) {
+        Conta conta = autenticacaoService.getContaAutenticada();
+        Carteira carteira = conta.obterCarteira(codigoCarteira);
+        Ordem ordem = carteira.getOrdens().stream()
+                .filter(o -> o.getCodigo().equals(codigoOrdem))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Carteira não encontrada"));
-
-        // 4. Validar código do papel
-        if (!dataService.codigoPapelExiste(codigoPapel)) {
-            throw new IllegalArgumentException("Papel não encontrado: " + codigoPapel.getValor());
-        }
-
-        // 5. Calcular preço total
-        Dinheiro precoTotal = dataService.obterPrecoMedio(codigoPapel, data, quantidade);
-
-        // 6. Criar e armazenar a ordem
-        Ordem novaOrdem = new Ordem(
-                codigoOrdem,
-                codigoPapel,
-                data,
-                quantidade,
-                precoTotal,
-                carteira);
-
-        ordens.add(novaOrdem);
-        carteira.adicionarOrdem(novaOrdem);
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Ordem não encontrada na carteira " + codigoCarteira.getValor()
+                ));
+    
+        // Imprime os valores conforme estão armazenados
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== Ordem " + codigoOrdem.getValor() + " ===\n");
+        sb.append(String.format(
+                "Código da Ordem : %s\n" +
+                "Negociação      : %s\n" +
+                "Data            : %s\n" +
+                "Quantidade      : %s\n" +
+                "Preço Final     : %s\n" +
+                "Carteira        : %s\n",
+                ordem.getCodigo().getValor(),
+                ordem.getCodNegociacao().getValor(),
+                ordem.getData().getValor(),
+                ordem.getQuantidade().getValor(),
+                ordem.getDinheiro().getValor(),
+                ordem.getCodigoCarteira().getValor()
+        ));
+        return sb.toString();
     }
-
-    public void excluirOrdem(Codigo codigoOrdem) {
-        Ordem ordem = buscarOrdem(codigoOrdem)
-                .orElseThrow(() -> new IllegalArgumentException("Ordem não encontrada: " + codigoOrdem.getValor()));
-
-        // 7. Validar associações antes de excluir
-        if (!ordem.getCarteira().getOrdens().contains(ordem)) {
-            throw new IllegalArgumentException("Ordem não está associada à carteira");
-        }
-
-        ordens.remove(ordem);
-        ordem.getCarteira().removerOrdem(ordem);
-    }
-
-    // 8. Método auxiliar melhorado
-    private Optional<Ordem> buscarOrdem(Codigo codigo) {
-        return ordens.stream()
-                .filter(o -> o.getCodigo().equals(codigo))
-                .findFirst();
-    }
-
-    // 9. Validação de código único
-    private void validarCodigoUnico(Codigo codigo) {
-        if (buscarOrdem(codigo).isPresent()) {
-            throw new IllegalArgumentException("Código de ordem já existe: " + codigo.getValor());
-        }
-    }
-
-    // 10. Listagem com segurança
-    public List<Ordem> listarOrdensPorCarteira(Codigo codigoCarteira) {
-        return autenticacaoService.getContaAutenticada()
-                .getCarteiras().stream()
-                .filter(c -> c.getCodigo().equals(codigoCarteira))
-                .findFirst()
-                .map(Carteira::getOrdens)
-                .orElseThrow(() -> new IllegalArgumentException("Carteira não encontrada"));
-    }
+    
+    
 }
