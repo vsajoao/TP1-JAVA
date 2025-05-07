@@ -5,13 +5,17 @@
         "markdown": false,
         "scminput": false
     },
-    "java.project.referencedLibraries": [
-        "lib/**/*.jar"
-    ],
+    "java.project.referencedLibraries": [],
     "java.test.config": {
         "vmArgs": [
             "-ea"
         ]
     },
-    "java.debug.settings.onBuildFailureProceed": true
+    "java.debug.settings.onBuildFailureProceed": true,
+    "java.project.sourcePaths": [],
+    "java.configuration.updateBuildConfiguration": "interactive"
+
+    
+
+    
 }
